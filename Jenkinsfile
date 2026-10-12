@@ -31,6 +31,37 @@ pipeline {
                 '''
             }
         }
+
+        stage('Docker Deploy') {
+            steps {
+                sh '''
+                    set -eu
+
+                    docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                    docker rm -f trend-app || true
+
+                    docker run -d \
+                        --name trend-app \
+                        --restart unless-stopped \
+                        -p 3000:3000 \
+                        ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                    for i in $(seq 1 15); do
+                        if curl -fsS http://localhost:3000/ > /dev/null; then
+                            echo "Trend application deployed successfully!"
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+
+                    echo "Deployment health check failed"
+                    docker logs --tail 30 trend-app
+                    exit 1
+                '''
+            }
+        }
+
     }
 
     post {
